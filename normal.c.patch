@@ -1,0 +1,183 @@
+*** normal.c	Mon May  8 09:46:48 2006
+--- normal.c.new	Fri May 12 17:02:10 2006
+***************
+*** 2234,2243 ****
+  #endif
+      int		regname;
+  
+  #if defined(FEAT_FOLDING)
+      save_cursor = curwin->w_cursor;
+  #endif
+- 
+      /*
+       * When GUI is active, always recognize mouse events, otherwise:
+       * - Ignore mouse event in normal mode if 'mouse' doesn't include 'n'.
+--- 2234,2253 ----
+  #endif
+      int		regname;
+  
++ 
++ #ifdef FEAT_GUI
++ 	"gui",
++ #else
++     // It seems the modifiers are lost before the mouse event is
++     // processed here.
++     if ( !do_opt_mousefunc( c, 0, mouse_row, mouse_col, -1, -1 ) )
++ 	return;
++ #endif
++ 
++ 
+  #if defined(FEAT_FOLDING)
+      save_cursor = curwin->w_cursor;
+  #endif
+      /*
+       * When GUI is active, always recognize mouse events, otherwise:
+       * - Ignore mouse event in normal mode if 'mouse' doesn't include 'n'.
+***************
+*** 2266,2271 ****
+--- 2276,2285 ----
+  
+      which_button = get_mouse_button(KEY2TERMCAP1(c), &is_click, &is_drag);
+  
++ 
++ 
++ 
++ 
+  #ifdef FEAT_MOUSESHAPE
+      /* May have stopped dragging the status or separator line.  The pointer is
+       * most likely still on the status or separator line. */
+***************
+*** 9103,9105 ****
+--- 9117,9248 ----
+      cap->retval |= CA_COMMAND_BUSY;	/* don't call edit() now */
+  }
+  #endif
++ 
++ 
++ 
++ 
++     int
++ do_opt_mousefunc( c, modifiers, mouse__row, mouse__col, x, y )
++     int c, modifiers, mouse__row, mouse__col, x, y;
++ {
++     char_u		*args[20];
++     static char_u	key[8];
++     static char_u	mouse__row_str[5];
++     static char_u	mouse__col_str[5];
++     static char_u	buf_row_str[5];
++     static char_u	buf_col_str[5];
++     static char_u	buf_vcol_str[5];
++     static char_u	x_str[8];
++     static char_u	y_str[8];
++     win_T		*wp = 0;
++     int			row = 0, buf_row = 0;
++     int			col = 0, buf_col = 0, buf_vcol = 0;
++     int			area = 0;
++     static char_u	area_str[20];
++     pos_T		mpos;
++     char_u		*save_mousefunc;
++     int			ret = 0, idx = 0, mask = 0;
++     char_u		mask_list[] = "MTCS234DA";
++     char_u		*screen_line;
++ 
++     if ( !*p_mousefunc )
++ 	return 1;
++ 
++ 
++     // At this point, the globals in this file are lagging, so update them:
++     mouse_row = mouse__row;
++     mouse_col = mouse__col;
++ 
++     row = mouse__row;
++     col = mouse__col;
++     wp = mouse_find_win(&row, &col);
++ 
++ 
++     area = get_fpos_of_mouse(&mpos);
++ 
++     // These are taken from get_fpos_of_mouse(), since it doesn't always
++     // return new values
++     //
++     if ( area == IN_BUFFER && wp != 0 
++ 	    && !mouse_comp_pos(curwin, &row, &col, &mpos.lnum) )
++     {
++ 	buf_col = vcol2col(wp, mpos.lnum, col);
++ 
++ 	buf_row = mpos.lnum;
++ 	buf_vcol = col + 1;
++ 	//buf_vcol = mpos.coladd;
++     }
++ 
++     switch( area )
++     {
++ 	case IN_BUFFER	    : STRCPY( area_str, "IN_BUFFER" );break;
++ 	case IN_UNKNOWN	    : STRCPY( area_str, "IN_UNKNOWN" );break;
++ 	case IN_SEP_LINE    : STRCPY( area_str, "IN_SEP_LINE" );break;
++ 	case IN_STATUS_LINE : STRCPY( area_str, "IN_STATUS_LINE" );break;
++ 	default : sprintf( area_str, "UNDEFINED(%d)", area );break;
++     }
++ 
++     sprintf( (char *)buf_row_str, "%d", buf_row );
++     sprintf( (char *)buf_col_str, "%d", buf_col );
++     sprintf( (char *)buf_vcol_str, "%d", buf_vcol );
++     sprintf( (char *)mouse__row_str, "%d", mouse__row );
++     sprintf( (char *)mouse__col_str, "%d", mouse__col );
++     sprintf( (char *)x_str, "%d", x );
++     sprintf( (char *)y_str, "%d", y );
++ 
++     c = simplify_key( c, &modifiers );
++ 
++     if ( c == 0 )
++ 	key[0] = '\0'; // might not be useful
++     else
++     {
++ 	int idx = 0;
++ 
++ 	if (modifiers != 0)
++ 	{
++ 	    key[idx++] = K_SPECIAL;
++ 	    key[idx++] = KS_MODIFIER;
++ 	    key[idx++] = modifiers;
++ 	}
++ 
++ 	key[idx++] = K_SPECIAL;
++ 	key[idx++] = KEY2TERMCAP0( c );
++ 	key[idx++] = KEY2TERMCAP1( c );
++ 
++ 	key[idx++] = '\0';
++     }
++ 
++ 
++     screen_line = alloc( Columns * 3 );
++     *screen_line = NUL;
++     for ( col = 0 ; col < Columns ; col++ )
++     {
++ 	char_u	bytes[3];
++ 	int	attr;
++ 	screen_getbytes(mouse__row, col, bytes, &attr);
++ 	STRNCAT( screen_line, bytes, 3 );
++     }
++ 
++     args[0] = key;
++     args[1] = buf_row_str;
++     args[2] = buf_col_str;
++     args[3] = buf_vcol_str;
++     args[4] = mouse__row_str;
++     args[5] = mouse__col_str;
++     args[6] = x_str;
++     args[7] = y_str;
++     args[8] = area_str;
++     args[9] = screen_line;
++ 
++ 
++     save_mousefunc = p_mousefunc;
++     p_mousefunc = "";
++     ret = call_func_retnr( save_mousefunc, 10, args, FALSE);
++     p_mousefunc = save_mousefunc;
++ 
++     free( screen_line );
++ 
++     return ret;
++ 
++ }
++ 

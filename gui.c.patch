@@ -1,0 +1,99 @@
+*** gui.c	Fri May 12 09:38:21 2006
+--- gui.c.new	Fri May 12 10:20:34 2006
+***************
+*** 2810,2819 ****
+--- 2810,2890 ----
+  			string[2] |= MOD_MASK_ALT;
+  		    add_to_input_buf(string, 10);
+  		}
++ 		// It's never getting here
++ 		//do_opt_mousefunc( TERMCAP2KEY( '.....
+  		return;
+  	    }
+      }
+  
++ 
++ 
++     {
++ 	int	    modifiers2 = 0;
++ 	static int  last_button;
++ 
++ 	button_char = KE_IGNORE;
++ 	switch (button)
++ 	{
++ 	    case MOUSE_LEFT:
++ 		button_char = KE_LEFTMOUSE; 
++ 		last_button = button;
++ 		break;
++ 	    case MOUSE_RIGHT:
++ 		button_char = KE_RIGHTMOUSE; 
++ 		last_button = button;
++ 		break;
++ 	    case MOUSE_MIDDLE:
++ 		button_char = KE_MIDDLEMOUSE; 
++ 		last_button = button;
++ 		break;
++ 
++ 	    case MOUSE_DRAG:
++ 		// This isn't right, but I don't see left/right anywhere
++ 		switch( last_button )
++ 		{
++ 		    case MOUSE_LEFT:
++ 			button_char = KE_LEFTDRAG; break;
++ 		    case MOUSE_MIDDLE:
++ 			button_char = KE_MIDDLEDRAG ; break;
++ 		    case MOUSE_RIGHT:
++ 			button_char = KE_RIGHTDRAG; break;
++ 		}
++ 		break;
++ 
++ 	    case MOUSE_RELEASE:
++ 		// This isn't right, but I don't see left/right anywhere
++ 		switch( last_button )
++ 		{
++ 		    case MOUSE_LEFT:
++ 			button_char = KE_LEFTRELEASE; break;
++ 		    case MOUSE_MIDDLE:
++ 			button_char = KE_MIDDLERELEASE ; break;
++ 		    case MOUSE_RIGHT:
++ 			button_char = KE_RIGHTRELEASE; break;
++ 		}
++ 		break;
++ 
++ 	}
++ 
++ 
++ 	/*
++ 	 * This call would be redundant with the one in do_mouse(), except
++ 	 * do_mouse() doesn't return any mouse clicks in the command line.
++ 	 */
++ 	button_char = TERMCAP2KEY( KS_EXTRA, button_char );
++ 
++ 	if (modifiers & MOUSE_SHIFT)
++ 	    modifiers2 |= MOD_MASK_SHIFT;
++ 	if (modifiers & MOUSE_CTRL)
++ 	    modifiers2 |= MOD_MASK_CTRL;
++ 	if (modifiers & MOUSE_ALT)
++ 	    modifiers2 |= MOD_MASK_ALT;
++ 
++ 	if ( !do_opt_mousefunc( button_char, modifiers2, Y_2_ROW(y), X_2_COL(x), x, y ) )
++ 	    return;
++ 
++     }
++ 
+  #ifdef FEAT_CLIPBOARD
+      /* If a clipboard selection is in progress, handle it */
+      if (clip_star.state == SELECT_IN_PROGRESS)
+***************
+*** 4535,4540 ****
+--- 4606,4615 ----
+  	    && !need_mouse_correct	/* not moving the pointer */
+  	    && gui.in_focus)		/* gvim in focus */
+      {
++ 
++ 	do_opt_mousefunc( 0, 0, Y_2_ROW(y), X_2_COL(x), x, y );
++ 
++ 
+  	/* Don't move the mouse when it's left or right of the Vim window */
+  	if (x < 0 || x > Columns * gui.char_width)
+  	    return;

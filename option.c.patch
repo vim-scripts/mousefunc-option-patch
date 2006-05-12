@@ -1,0 +1,26 @@
+*** option.c	Mon May  8 09:47:55 2006
+--- option.c.new	Mon May  8 09:47:42 2006
+***************
+*** 1743,1748 ****
+--- 1743,1753 ----
+  			    (char_u *)NULL, PV_NONE,
+  #endif
+  			    {(char_u *)FALSE, (char_u *)0L}},
++ 
++     {"mousefunc",   "mfn",  P_STRING|P_VI_DEF,
++ 			    (char_u *)&p_mousefunc, PV_NONE,
++ 			    {(char_u *)"", (char_u *)0L}},
++ 
+      {"mousehide",   "mh",   P_BOOL|P_VI_DEF,
+  #ifdef FEAT_GUI
+  			    (char_u *)&p_mh, PV_NONE,
+***************
+*** 1775,1780 ****
+--- 1780,1786 ----
+      {"mousetime",   "mouset",	P_NUM|P_VI_DEF,
+  			    (char_u *)&p_mouset, PV_NONE,
+  			    {(char_u *)500L, (char_u *)0L}},
++ 
+      {"mzquantum",  "mzq",   P_NUM,
+  #ifdef FEAT_MZSCHEME
+  			    (char_u *)&p_mzq, PV_NONE,

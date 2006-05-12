@@ -1,0 +1,82 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=1540
+
+When compiled with this patch set, gvim will have a new option, "mousefunc" which will call a user script function for every mouse event.
+
+The zip file contains a test script which demonstrates how to do things like:
+
+
+" This script tests various aspects of the "mousefunc" option:
+"
+" - demonstrate having the mouse move tabs in the tabline.
+"
+" - text hotspots:	Here is mouseover |tag1| and here is |tag2|
+"
+" - verbose option which shows all mouse info.
+"
+" - mouse-follow highlighting (set s:show_bullseye)
+"
+" - associate actions with clicking on statusline words
+
+
+
+
+
+From the options.txt doc file:
+
+
+'mousefunc' 'mfn'	string	(default empty)
+			global
+			{not in Vi}
+	When nonempty, this option calls the given function when mouse events
+	(click, drag, move, etc.) are detected.  The function should accept
+	these arguments:
+>
+		MouseFunc(	mouse_key, 
+				\ buf_row, buf_col, buf_vcol, 
+				\ mouse_row, mouse_col, 
+				\ x, y,
+				\ area, screen_line )
+<
+	"mouse_key" is a string containing up to 6 chars.  It will match
+	against a string like:   a:mouse_key == "\<LeftMouse>".
+	"mouse_key" can be empty, particularly when cursor-move-only events
+	are delivered.  
+
+	"buf_row/col/vcol" should match line(".") and col(".") if you were
+	to click in a buffer at that point.
+
+	"mouse_row/col" are independent of windows and buffers.
+	
+	The "x" and "y" are in pixels, and can be negative, when that
+	information isn't available (see also |mousefocus| to have "x" and
+	"y" track the mouse cursor).  
+
+	"area" is Vim's idea of where the mouse is.  Values can be:
+	"IN_BUFFER", "IN_UNKNOWN", "IN_SEP_LINE", "IN_STATUS_LINE".
+
+	"screen_line" contains the literal characters in "mouse_row" which
+	have been written to the screen, rather than any buffer.  Useful to
+	read what's on the statusline, tabline, and command line areas.
+	
+	The function should return 0 to consume the mouse click, or 1 to
+	pass it on transparently.
+
+	The |mousefunc| option is set empty for the duration of the call to
+	prevent recursion.  Setting it again during the call could have
+	unexpected problems.
+
+	It intercepts the mouse events at a low level, which has its good
+	and bad points.  The good is that you get the mouse events before
+	other restrictions like statusline, tabline, empty regions, etc.,
+	and receive mouse events while in any mode.  The bad is that you
+	have to watch out for things like recursion errors (i.e.  calling
+	getchar() from a script function while |mousefunc| is set).
+
+	This function is called often when the mouse is moving, so attention
+	should be given to returning early out of as many cycles as
+	possible.
+
+	At the moment, drag and release events are approximated based on the
+	last primary event (i.e. <leftmouse> or <rightmouse> ).
+
+

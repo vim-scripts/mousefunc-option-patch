@@ -1,0 +1,12 @@
+*** option.h	Mon May  8 09:47:32 2006
+--- option.h.new	Mon May  8 09:47:24 2006
+***************
+*** 612,617 ****
+--- 612,618 ----
+  EXTERN int	p_mousef;	/* 'mousefocus' */
+  EXTERN int	p_mh;		/* 'mousehide' */
+  #endif
++ EXTERN char_u	*p_mousefunc;	/* 'mousefunc' */
+  EXTERN char_u	*p_mousem;	/* 'mousemodel' */
+  EXTERN long	p_mouset;	/* 'mousetime' */
+  EXTERN int	p_more;		/* 'more' */

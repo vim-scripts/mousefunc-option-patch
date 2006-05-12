@@ -1,0 +1,68 @@
+*** options.txt	Mon May  8 10:03:39 2006
+--- options.txt.new	Fri May 12 17:02:23 2006
+***************
+*** 4607,4612 ****
+--- 4607,4669 ----
+  	default because it makes using the pull down menus a little goofy, as
+  	a pointer transit may activate a window unintentionally.
+  
++ 						*'mousefunction'* *'mfn'*
++ 'mousefunc' 'mfn'	string	(default empty)
++ 			global
++ 			{not in Vi}
++ 	When nonempty, this option calls the given function when mouse events
++ 	(click, drag, move, etc.) are detected.  The function should accept
++ 	these arguments:
++ >
++ 		MouseFunc(	mouse_key, 
++ 				\ buf_row, buf_col, buf_vcol, 
++ 				\ mouse_row, mouse_col, 
++ 				\ x, y,
++ 				\ area, screen_line )
++ <
++ 	"mouse_key" is a string containing up to 6 chars.  It will match
++ 	against a string like:   a:mouse_key == "\<LeftMouse>".
++ 	"mouse_key" can be empty, particularly when cursor-move-only events
++ 	are delivered.  
++ 
++ 	"buf_row/col/vcol" should match line(".") and col(".") if you were
++ 	to click in a buffer at that point.
++ 
++ 	"mouse_row/col" are independent of windows and buffers.
++ 	
++ 	The "x" and "y" are in pixels, and can be negative, when that
++ 	information isn't available (see also |mousefocus| to have "x" and
++ 	"y" track the mouse cursor).  
++ 
++ 	"area" is Vim's idea of where the mouse is.  Values can be:
++ 	"IN_BUFFER", "IN_UNKNOWN", "IN_SEP_LINE", "IN_STATUS_LINE".
++ 
++ 	"screen_line" contains the literal characters in "mouse_row" which
++ 	have been written to the screen, rather than any buffer.  Useful to
++ 	read what's on the statusline, tabline, and command line areas.
++ 	
++ 	The function should return 0 to consume the mouse click, or 1 to
++ 	pass it on transparently.
++ 
++ 	The |mousefunc| option is set empty for the duration of the call to
++ 	prevent recursion.  Setting it again during the call could have
++ 	unexpected problems.
++ 
++ 	It intercepts the mouse events at a low level, which has its good
++ 	and bad points.  The good is that you get the mouse events before
++ 	other restrictions like statusline, tabline, empty regions, etc.,
++ 	and receive mouse events while in any mode.  The bad is that you
++ 	have to watch out for things like recursion errors (i.e.  calling
++ 	getchar() from a script function while |mousefunc| is set).
++ 
++ 	This function is called often when the mouse is moving, so attention
++ 	should be given to returning early out of as many cycles as
++ 	possible.
++ 
++ 	At the moment, drag and release events are approximated based on the
++ 	last primary event (i.e. <leftmouse> or <rightmouse> ).
++ 
++ 
+  			*'mousehide'* *'mh'* *'nomousehide'* *'nomh'*
+  'mousehide' 'mh'	boolean	(default on)
+  			global
