@@ -3,6 +3,7 @@
 " This script tests various aspects of the "mousefunc" option:
 "
 " - demonstrate having the mouse move tabs in the tabline.
+"   Also, associate actions with clicking on tabline words
 "   (Will use TabLineSet.vim indexes if available.)
 "
 " - text hotspots:	Here is mouseover |tag1| and here is |tag2|
@@ -45,7 +46,10 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	call s:Show_mouse_info( a:key, a:buf_row, a:buf_col, a:buf_vcol, a:mouse_row, a:mouse_col, a:x, a:y, a:area, a:screen_line )
 
 
-	let s:scrword = matchstr( a:screen_line, '\<\w*\%' . ( a:mouse_col ) . 'c\w*\>' )
+	let s:scrword = matchstr( a:screen_line, '\<\w*\%' . ( a:mouse_col + 1 ) . 'c\w*\>' )
+	if s:scrword == ''
+		let s:scrword = matchstr( a:screen_line, '\S*\%' . ( a:mouse_col + 1 ) . 'c\S*' )
+	endif
 
 	"
 	" Drag tabline tabs:
@@ -55,6 +59,25 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	"
 	if ( a:mouse_row < 1 ) || ( exists('g:TabLineSet_row') 
 				\ && a:mouse_row <= g:TabLineSet_row )
+
+		if a:key == "\<leftrelease>" 
+			if s:scrword =~ '\d*->'
+				let g:TabLineSet_max_wrap += 1
+				silent 1new
+				quit
+				call feedkeys( ":\<CR>", 't' )
+				return 0
+			elseif s:scrword =~ '<-\d*'
+				let g:TabLineSet_max_wrap -= 1
+				if g:TabLineSet_max_wrap  < 1
+					let g:TabLineSet_max_wrap = 1
+				endif
+				silent 1new
+				quit
+				call feedkeys( ":\<CR>", 't' )
+				return 0
+			endif
+		endif
 
 		if a:key == "\<leftmouse>"
 			if s:tab_drag_state == -1
@@ -213,28 +236,30 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	"
 	" Test clicking on an area in the status lines:
 	"
-	if ( a:area == "IN_STATUS_LINE" && a:key == "\<leftrelease>" )
-		if s:scrword == "_GROW_" || s:scrword == "GRO"
-			if winnr() == winnr("$")
-				let &cmdheight += 1
-			else
-				wincmd +
+	if a:key == "\<leftrelease>"
+		if a:area == "IN_STATUS_LINE" 
+			if s:scrword == "_GROW_" || s:scrword == "GRO"
+				if winnr() == winnr("$")
+					let &cmdheight += 1
+				else
+					wincmd +
+				endif
+			elseif s:scrword == "_SHRINK_" || s:scrword == "SHR"
+				if winnr() == winnr("$")
+					let &cmdheight -= 1
+				else
+					wincmd -
+				endif
+			elseif s:scrword == "_SPLIT_" || s:scrword == "SPL"
+				split
+			elseif s:scrword == "_VSPLIT_" || s:scrword == "VSPL"
+				vsplit
+			elseif s:scrword == "_QUIT_" || s:scrword == "QU"
+				quit
 			endif
-		elseif s:scrword == "_SHRINK_" || s:scrword == "SHR"
-			if winnr() == winnr("$")
-				let &cmdheight -= 1
-			else
-				wincmd -
-			endif
-		elseif s:scrword == "_SPLIT_" || s:scrword == "SPL"
-			split
-		elseif s:scrword == "_VSPLIT_" || s:scrword == "VSPL"
-			vsplit
-		elseif s:scrword == "_QUIT_" || s:scrword == "QU"
-			quit
+			redraw
 		endif
-		redraw
-	endif
+	endif " if leftrelease
 
 
 
