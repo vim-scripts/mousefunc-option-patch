@@ -3,6 +3,7 @@
 " This script tests various aspects of the "mousefunc" option:
 "
 " - demonstrate having the mouse move tabs in the tabline.
+"   (Will use TabLineSet.vim indexes if available.)
 "
 " - text hotspots:	Here is mouseover |tag1| and here is |tag2|
 "
@@ -22,6 +23,7 @@ let s:test_cmdline = 0
 let s:last_mouse_row = 0
 let s:last_mouse_col = 0
 let s:found_cword = ''
+let s:scrword = ''
 let s:last_hword = ''
 let s:last_h_row = 0
 let s:last_h_col = 0
@@ -43,7 +45,7 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	call s:Show_mouse_info( a:key, a:buf_row, a:buf_col, a:buf_vcol, a:mouse_row, a:mouse_col, a:x, a:y, a:area, a:screen_line )
 
 
-	let scrword = matchstr( a:screen_line, '\<\S*\%' . ( a:mouse_col ) . 'c\S*\>' )
+	let s:scrword = matchstr( a:screen_line, '\<\w*\%' . ( a:mouse_col ) . 'c\w*\>' )
 
 	"
 	" Drag tabline tabs:
@@ -51,35 +53,106 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	" This would be better if it had access to the tabline index, but for now,
 	" just temporarily move to the selected tab to get it's number.
 	"
-	if ( a:mouse_row < 1 )
-		if a:key == "\<leftdrag>" && s:tab_drag_state == 0
-			let s:tab_drag_state = 1
+	if ( a:mouse_row < 1 ) || ( exists('g:TabLineSet_row') 
+				\ && a:mouse_row <= g:TabLineSet_row )
+
+		if a:key == "\<leftmouse>"
+			if s:tab_drag_state == -1
+				"echomsg 'returning mouse'
+				let s:tab_drag_state = 0
+				return 1
+			else
+				return 0
+			endif
+		endif
+
+		if a:key == "\<leftrelease>" && s:tab_drag_state == 0
+			"echomsg 'sending'
 			call feedkeys( "\<leftmouse>", "t" )
+			let s:tab_drag_state = -1
+			return 0
+		elseif a:key == "\<leftdrag>" && s:tab_drag_state == 0
+			let s:save_lazyredraw = &lazyredraw
+			set lazyredraw
+			let s:tab_drag_state = 1
+			let s:return_to_tab = tabpagenr()
+			if exists( 'g:TabLineSet_idxs' ) 
+			else
+				call feedkeys( "\<leftmouse>", "t" )
+			endif
 			return 0
 		elseif a:key == "\<leftdrag>" && s:tab_drag_state == 1
 			let s:tab_drag_state = 2
-			let s:start_tab = tabpagenr()
+			if exists( 'g:TabLineSet_idxs' ) 
+				let s:start_tab = 
+				\ g:TabLineSet_idxs[ ( a:mouse_row * &columns ) + a:mouse_col ]
+			else
+				let s:start_tab = tabpagenr()
+			endif
 			return 0
 		elseif a:key == "\<leftdrag>" && s:tab_drag_state == 2
+			" Why doesn't this seem to do anything?:
+			"exe 'tabnext ' . s:return_to_tab
+			"redraw
+			if exists( 'g:TabLineSet_idxs' ) 
+			else
+				call feedkeys( ':tabnext ' . s:return_to_tab . "\<CR>" , 't')
+			endif
 			let s:tab_drag_state = 3
 			return 0
+		elseif a:key == "\<leftdrag>" && s:tab_drag_state == 3
+			" This gets an odd error ('not allowed here'):
+			"exe 'tabnext ' . s:return_to_tab
+			echohl WildMenu
+			if exists( 'g:TabLineSet_idxs' ) 
+				let s:goto_tab = 
+				\ g:TabLineSet_idxs[ ( a:mouse_row * &columns ) + a:mouse_col ]
+				echo "Moving tab " . s:start_tab . ' -> ' . s:goto_tab . repeat( '.', s:counter % 10 )
+			else
+				echo "Moving tab #" . s:start_tab . repeat( '.', s:counter % 10 )
+			endif
+			let s:counter += 1
+			return 0
 		elseif a:key == "\<leftrelease>" && s:tab_drag_state == 3
+			echohl None
+			"echomsg 'moving to state 4'
 			let s:tab_drag_state = 4
-			call feedkeys( "\<leftmouse>", "t" )
+			if exists( 'g:TabLineSet_idxs' ) 
+				" Need this to wake it up to get to state 4 code, why?
+				call feedkeys( ":\<esc>\<leftmouse>", 't' )
+			else
+				" I dont know why this helps state 4, since state 4 is usually
+				" triggered by a mouse move:
+				call feedkeys( "\<leftmouse>", "t" )
+			endif
 			return 0
 		elseif s:tab_drag_state == 4
-			let s:goto_tab = tabpagenr()
-			if s:goto_tab == s:start_tab
-				return 1
-			endif
-			exe 'tabnext ' . s:start_tab
-			exe 'tabmove ' . ( s:goto_tab - 1 )
+			"echomsg 'at state 4'
 			let s:tab_drag_state = 0
-			return 1
+			if exists( 'g:TabLineSet_idxs' ) 
+				let s:goto_tab = 
+				\ g:TabLineSet_idxs[ ( a:mouse_row * &columns ) + a:mouse_col ]
+			else
+				let s:goto_tab = tabpagenr()
+			endif
+			if s:goto_tab == s:start_tab
+				"echomsg 'returning start/stop same'
+				return 0
+			endif
+			"echomsg 'tabnext ' . s:start_tab
+			exe 'tabnext ' . s:start_tab
+			"echomsg 'tabmove ' . ( s:goto_tab - 1 )
+			exe 'tabmove ' . ( s:goto_tab - 1 )
+			"echomsg 'tabnext ' . s:return_to_tab
+			exe 'tabnext ' . s:return_to_tab
+			let &lazyredraw = s:save_lazyredraw
+			redraw
+			return 0
 		else
 		endif
 	else
 		let s:tab_drag_state = 0
+		echohl None
 	endif
 
 
@@ -141,23 +214,23 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	" Test clicking on an area in the status lines:
 	"
 	if ( a:area == "IN_STATUS_LINE" && a:key == "\<leftrelease>" )
-		if scrword == "_GROW_"
+		if s:scrword == "_GROW_" || s:scrword == "GRO"
 			if winnr() == winnr("$")
 				let &cmdheight += 1
 			else
 				wincmd +
 			endif
-		elseif scrword == "_SHRINK_"
+		elseif s:scrword == "_SHRINK_" || s:scrword == "SHR"
 			if winnr() == winnr("$")
 				let &cmdheight -= 1
 			else
 				wincmd -
 			endif
-		elseif scrword == "_SPLIT_"
+		elseif s:scrword == "_SPLIT_" || s:scrword == "SPL"
 			split
-		elseif scrword == "_VSPLIT_"
+		elseif s:scrword == "_VSPLIT_" || s:scrword == "VSPL"
 			vsplit
-		elseif scrword == "_QUIT_"
+		elseif s:scrword == "_QUIT_" || s:scrword == "QU"
 			quit
 		endif
 		redraw
@@ -171,11 +244,11 @@ function! Tst_mousefunc( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_col, 
 	if s:test_cmdline
 		echo 'Test mouse-over in ->|command|<- line'
 		let s:test_cmdline = 0
-		if scrword == 'command' && a:area == "IN_STATUS_LINE"
+		if s:scrword == 'command' && a:area == "IN_STATUS_LINE"
 			echo 'Test mouse-over in |<-command->| line'
 		endif
 	else
-		if scrword == 'command' && a:area == "IN_STATUS_LINE"
+		if s:scrword == 'command' && a:area == "IN_STATUS_LINE"
 			let s:test_cmdline = 1
 		endif
 	endif
@@ -221,6 +294,7 @@ function! s:Show_mouse_info( key, buf_row, buf_col, buf_vcol, mouse_row, mouse_c
 				\ . ', mouse_row=' . a:mouse_row
 				\ . ', mouse_row=' . a:mouse_col
 				\ . ', cword=' . s:found_cword
+				\ . ', scrword=' . s:scrword
 				\ . ( a:key == '' ? '' : ', key=' . strtrans(a:key, 'l')
 				\ . ', 0=' . char2nr( a:key[0] )
 				\ . ', 1=' . char2nr( a:key[1] )
@@ -336,10 +410,12 @@ endfunction
 
 
 
-if &statusline =~ '_GROW_'
-	let &statusline = substitute( &statusline, '\[__*GROW.*', '', '' )
+if &statusline =~ '\(_GROW_\|GRO/\)'
+	let &statusline = substitute( &statusline, '\s*\[__*GROW.*', '', '' )
+	let &statusline = substitute( &statusline, '\s*\[GRO/.*', '', '' )
 endif
-let &statusline .= " [_GROW_] [_SHRINK_] [_SPLIT_] [_VSPLIT_] [_QUIT_]"
+"let &statusline .= " [_GROW_] [_SHRINK_] [_SPLIT_] [_VSPLIT_] [_QUIT_]"
+let &statusline .= " [GRO/SHR/SPL/VSPL/QU]"
 
 
 set mousefunc=Tst_mousefunc
